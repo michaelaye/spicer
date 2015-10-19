@@ -100,3 +100,8 @@ class Spicer(HasTraits):
             raise SpiceError('target_id, using bodn2c')
         else:
             return res
+
+    @property
+    def radii(self):
+        _, radii = spice.bodvrd(self.target, "RADII", 3)
+        return Radii(*radii)

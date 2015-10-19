@@ -42,4 +42,11 @@ def test_spicer_target_id_failure():
     s = spicer.Spicer()
     s.target = 'hello'
     with pytest.raises(exceptions.SpiceError):
-        _ = s.target_id
+        print(s.target_id)
+
+
+def test_spicer_radii():
+    s = spicer.Spicer()
+    s.target = 'Mars'
+    assert np.allclose([3396.1900000000001, 3396.1900000000001, 3376.1999999999998],
+                       [s.radii.a, s.radii.b, s.radii.c])
