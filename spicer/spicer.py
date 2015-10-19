@@ -1,13 +1,14 @@
+import datetime as dt
 from collections import namedtuple
 
+import dateutil.parser as tparser
 import numpy as np
 import spiceypy as spice
-from traitlets import Float, HasTraits
+from traitlets import Float, HasTraits, Unicode
 
 from .kernels import load_generic_kernels
 
 load_generic_kernels()
-
 
 # constants
 L_sol = 3.839e26  # [Watt]
@@ -69,3 +70,20 @@ class Coords(HasTraits):
     def __call__(self):
         print("Longitude: {0} deg\nLatitude: {1} deg\nRadius: {2} km"
               .format(self.dlon, self.dlat, self.radius))
+
+
+class Spicer(HasTraits):
+    method = Unicode('Near point:ellipsoid')
+    corr = Unicode('LT+S')
+
+    def __init__(self, time=None):
+        if time is None:
+            self.time = dt.datetime.now()
+        else:
+            self.time = tparser.parse(time)
+
+    @property
+    def utc(self):
+        return self.time.isoformat()
+
+
