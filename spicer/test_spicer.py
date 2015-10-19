@@ -50,3 +50,12 @@ def test_spicer_radii():
     s.target = 'Mars'
     assert np.allclose([3396.1900000000001, 3396.1900000000001, 3376.1999999999998],
                        [s.radii.a, s.radii.b, s.radii.c])
+
+
+def test_spicer_solar_constant():
+    s = spicer.Spicer('2015-10-18T23:50:24.747598')
+    s.target = 'Earth'
+    s.ref_frame = 'IAU_EARTH'
+    assert np.allclose([-1.46834268e+08,   3.20689425e+06,  -2.53194083e+07],
+                       s.center_to_sun)
+    assert np.allclose([1375.39440028], s.solar_constant)

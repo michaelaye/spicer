@@ -1,4 +1,5 @@
 import datetime as dt
+import math
 from collections import namedtuple
 
 import dateutil.parser as tparser
@@ -6,8 +7,8 @@ import numpy as np
 import spiceypy as spice
 from traitlets import Float, HasTraits, Unicode
 
-from .kernels import load_generic_kernels
 from .exceptions import SpiceError
+from .kernels import load_generic_kernels
 
 load_generic_kernels()
 
@@ -75,9 +76,10 @@ class Coords(HasTraits):
 
 class Spicer(HasTraits):
     method = Unicode('Near point:ellipsoid')
-    corr = Unicode('LT+S')
+    corr = Unicode('none')
 
     target = Unicode
+    ref_frame = Unicode
 
     def __init__(self, time=None):
         if time is None:
@@ -105,3 +107,24 @@ class Spicer(HasTraits):
     def radii(self):
         _, radii = spice.bodvrd(self.target, "RADII", 3)
         return Radii(*radii)
+
+    def target_to_object(self, object_):
+        """Object should be string of body, e.g. 'SUN'.
+
+        Output has (object_vector[3], lighttime)
+        # Potential TODO: spkezp would be faster, but it uses body codes
+        instead of names
+        """
+        output = spice.spkpos(object_, self.et, self.ref_frame, self.corr,
+                              self.target)
+        return output
+
+    @property
+    def center_to_sun(self):
+        cts, lighttime = self.target_to_object("SUN")
+        return cts
+
+    @property
+    def solar_constant(self):
+        dist = spice.vnorm(self.center_to_sun)
+        return L_sol / (4 * math.pi * (dist*1e3)**2)
