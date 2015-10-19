@@ -1,8 +1,9 @@
-from spicer import spicer
+from spicer import spicer, exceptions
 import numpy as np
 from math import pi
 import spiceypy as spice
 import datetime as dt
+import pytest
 
 
 def test_illum_angles():
@@ -27,3 +28,18 @@ def test_spicer_time_init():
     s = spicer.Spicer('2010-01-02')
     assert s.utc == '2010-01-02T00:00:00'
     assert s.time == dt.datetime(2010, 1, 2)
+    assert np.allclose([315662466.18395346], [s.et])
+
+
+def test_spicer_target_id():
+    s = spicer.Spicer()
+    s.target = 'Mars'
+    assert s.target_id == 499
+
+
+# @pytest.mark.xfail(raises=exceptions.SpiceError)
+def test_spicer_target_id_failure():
+    s = spicer.Spicer()
+    s.target = 'hello'
+    with pytest.raises(exceptions.SpiceError):
+        _ = s.target_id

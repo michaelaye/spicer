@@ -7,6 +7,7 @@ import spiceypy as spice
 from traitlets import Float, HasTraits, Unicode
 
 from .kernels import load_generic_kernels
+from .exceptions import SpiceError
 
 load_generic_kernels()
 
@@ -76,6 +77,8 @@ class Spicer(HasTraits):
     method = Unicode('Near point:ellipsoid')
     corr = Unicode('LT+S')
 
+    target = Unicode
+
     def __init__(self, time=None):
         if time is None:
             self.time = dt.datetime.now()
@@ -86,4 +89,14 @@ class Spicer(HasTraits):
     def utc(self):
         return self.time.isoformat()
 
+    @property
+    def et(self):
+        return spice.utc2et(self.utc)
 
+    @property
+    def target_id(self):
+        res, check = spice.bodn2c(self.target)
+        if check is not True:
+            raise SpiceError('target_id, using bodn2c')
+        else:
+            return res
