@@ -128,3 +128,56 @@ class Spicer(HasTraits):
     def solar_constant(self):
         dist = spice.vnorm(self.center_to_sun)
         return L_sol / (4 * math.pi * (dist*1e3)**2)
+
+    @property
+    def north_pole(self):
+        return (0.0, 0.0, self.radii.c)
+
+    @property
+    def south_pole(self):
+        return (0.0, 0.0, -self.radii.c)
+
+    def srfrec(self, lon, lat, body=None):
+        """Convert lon/lat to rectangular coordinates.
+
+        Convert planetocentric longitude and latitude of a surface point on a
+        specified body to rectangular coordinates.
+
+        self.target needs to be set for this!
+
+        Input of angles in degrees, conversion is done here.
+        If the body is not a SPICE ID, it will be converted.
+        >>> mspice = MarsSpicer()
+        >>> print('{0:g} {1:g} {2:g}'.format(*mspice.srfrec(0,85)))
+        294.268 0 3363.5
+        """
+        if body is None:
+            body = self.target_id
+        if not str(body).isdigit():
+            body = spice.bodn2c(body)
+        return spice.srfrec(body, np.deg2rad(lon), np.deg2rad(lat))
+
+    def set_spoint_by(self, func_str=None, lon=None, lat=None):
+        """This executes the class method with the name stored in the dict.
+
+        ... and sets attribute spoint to the first item of the return.
+        This works because both sincpt and subpnt return spoint as first item.
+        """
+        if func_str is not None:
+            if not self.instrument or not self.obs:
+                print("Observer and/or instrument have to be set first.")
+                return
+            if func_str in 'subpnt':
+                spoint = self.subpnt()[0]
+            elif func_str in 'sincpt':
+                spoint = self.sincpt()[0]
+            else:
+                raise Exception("No valid method recognized.")
+        elif lon is not None and lat is not None:
+            # removing these, because they should depend on spoint,
+            # but they don't
+            # self.lon = lon
+            # self.lat = lat
+            spoint = self.srfrec(lon, lat).tolist()
+        self.spoint_set = True
+        self.spoint = spoint

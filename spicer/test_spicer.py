@@ -59,3 +59,10 @@ def test_spicer_solar_constant():
     assert np.allclose([-1.46834268e+08,   3.20689425e+06,  -2.53194083e+07],
                        s.center_to_sun)
     assert np.allclose([1375.39440028], s.solar_constant)
+
+
+def test_spicer_set_spoint_by_latlon():
+    s = spicer.Spicer()
+    s.target = 'mars'
+    s.set_spoint_by(lat=0, lon=0)
+    assert np.allclose([3396.19, 0.0, 0.0], s.spoint)
