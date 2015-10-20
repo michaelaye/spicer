@@ -7,7 +7,7 @@ import numpy as np
 import spiceypy as spice
 from traitlets import Float, HasTraits, Unicode
 
-from .exceptions import SpiceError
+from .exceptions import SpiceError, MissingParameterError
 from .kernels import load_generic_kernels
 
 load_generic_kernels()
@@ -283,7 +283,9 @@ class Spicer(HasTraits):
         func_str : {'subpnt', 'sincpt'}
 
         """
-        if func_str is not None:
+        if func_str is not None and func_str not in ['subpnt', 'sincpt']:
+            raise NotImplementedError('Only "sincpt" and "subpnt" are supported at this time.')
+        elif func_str is not None:
             raise NotImplementedError('not yet implemented.')
             # if not self.instrument or not self.obs:
             #     print("Observer and/or instrument have to be set first.")
@@ -294,11 +296,10 @@ class Spicer(HasTraits):
             #     spoint = self.sincpt()[0]
             # else:
             #     raise Exception("No valid method recognized.")
-        elif None is in [lat, lon]:
-
-        elif lon is not None and lat is not None:
+        elif None in [lat, lon]:
+            raise MissingParameterError('both lat and lon need to be given.')
+        else:
             coords = SurfaceCoords(lat=lat, lon=lon)
             spoint = self.srfrec(coords).tolist()
-        else
         self.spoint_set = True
         self.spoint = spoint
