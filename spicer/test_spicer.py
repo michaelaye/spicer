@@ -1,9 +1,9 @@
-from spicer import spicer, exceptions
-import numpy as np
-from math import pi
-import spiceypy as spice
 import datetime as dt
+from math import pi
+
+import numpy as np
 import pytest
+from spicer import exceptions, spicer
 
 
 def test_illum_angles():
