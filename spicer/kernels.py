@@ -1,9 +1,13 @@
+"""This module helps to manage SPICE kernels, incl. downloading and listing
+loaded kernels (which unbelievably is not available from SPICE directly).
+"""
 import os
 from urllib.request import urlretrieve
-from pathlib import Path
+
 import spiceypy as spice
+from pathlib import Path
 
-
+# TODO: Use resources to get local file paths.
 modpath = Path(os.path.abspath(__file__))
 dir_path = modpath.parent
 
@@ -28,10 +32,7 @@ def do_download(source, target):
     target: pathlib.Path
     """
 
-    try:
-        source.parent.mkdir(parents=True)
-    except FileExistsError:
-        pass
+    source.parent.mkdir(parents=True, exist_ok=True)
     print('downloading', source, 'to', target)
     urlretrieve(source, str(target))
 
@@ -64,8 +65,7 @@ def load_generic_kernels():
 
 
 def load_planet_masses_kernel():
-    spice.furnsh(os.path.join(KERNELROOT,
-                              'pck/de403-masses.tpc'))
+    spice.furnsh(KERNELROOT  / 'pck/de403-masses.tpc')
 
 
 def show_loaded_kernels():
