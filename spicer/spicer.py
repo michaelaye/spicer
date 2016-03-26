@@ -117,7 +117,7 @@ class SurfaceCoords(HasTraits):
         "float : Degree version of radians longitude."
         dlon = np.rad2deg(self.lon)
         # force 360 eastern longitude:
-        if dlon < 0:
+        while dlon < 0:
             dlon += 360.0
         return dlon
 
