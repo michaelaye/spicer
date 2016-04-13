@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="spicer",
-    version="0.1a0",
+    version="0.2.b0",
     packages=find_packages(),
 
     # metadata
