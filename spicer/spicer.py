@@ -169,18 +169,34 @@ class Spicer(HasTraits):
     method = Unicode('Near point:ellipsoid')
     corr = Unicode('none')
 
-    body = Unicode
+    _body = Unicode
+    _ref_frame = Unicode
 
-    def __init__(self, time=None):
+    def __init__(self, body, time=None):
+        self._body = body
         if time is None:
             self.time = dt.datetime.now()
         else:
             self.time = tparser.parse(time)
+        self._ref_frame = "IAU_" + str(self.body).upper()
+
+    @property
+    def body(self):
+        return self._body
+
+    @body.setter
+    def body(self, value):
+        self._body = value
+        self.ref_frame = "IAU_" + str(value).upper()
 
     @property
     def ref_frame(self):
         "str: Reference frame for SPICE calculations."
-        return "IAU_"+self.body
+        return self._ref_frame
+
+    @ref_frame.setter
+    def ref_frame(self, value):
+        self._ref_frame = value
 
     @property
     def utc(self):
