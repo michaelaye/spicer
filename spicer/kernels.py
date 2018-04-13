@@ -18,6 +18,7 @@ download_root = 'http://naif.jpl.nasa.gov/pub/naif/generic_kernels/'
 generic_kernel_list = ['lsk/naif0011.tls',
                        'pck/pck00010.tpc',
                        'spk/planets/de421.bsp',
+                       'spk/planets/de403-masses.tpc',
                        # 'spk/planets/de430.bsp',
                        ]
 generic_kernels = [KERNELROOT.joinpath(i) for i in generic_kernel_list]
@@ -65,7 +66,7 @@ def load_generic_kernels():
 
 
 def load_planet_masses_kernel():
-    spice.furnsh(KERNELROOT  / 'pck/de403-masses.tpc')
+    spice.furnsh(KERNELROOT / 'pck/de403-masses.tpc')
 
 
 def show_loaded_kernels():
