@@ -5,7 +5,7 @@ from collections import namedtuple
 import dateutil.parser as tparser
 import numpy as np
 import spiceypy as spice
-from traitlets import Float, HasTraits, Unicode
+from traitlets import Float, HasTraits, Unicode, Enum
 
 from .exceptions import SpiceError, MissingParameterError
 from .kernels import load_generic_kernels
@@ -165,10 +165,12 @@ class Spicer(HasTraits):
     solar_constant
     north_pole
     south_pole
+    l_s
+    sun_direction
     """
     method = Unicode('Near point:ellipsoid')
     corr = Unicode('none')
-
+    target = None
     _body = Unicode
     _ref_frame = Unicode
 
@@ -211,11 +213,8 @@ class Spicer(HasTraits):
     @property
     def target_id(self):
         "int : SPICE Body ID for self.target."
-        res, check = spice.bodn2c(self.target)
-        if check is not True:
-            raise SpiceError('target_id, using bodn2c')
-        else:
-            return res
+        res = spice.bodn2c(self.target)
+        return res
 
     @property
     def radii(self):
@@ -238,7 +237,8 @@ class Spicer(HasTraits):
 
         # TODO: spkezp would be faster, but it uses body codes instead of names
         """
-        output = spice.spkpos(target, self.et, self.ref_frame, self.corr, self.body)
+        output = spice.spkpos(
+            target, self.et, self.ref_frame, self.corr, self.body)
         return output
 
     @property
@@ -251,7 +251,7 @@ class Spicer(HasTraits):
     def solar_constant(self):
         "float : With global value L_s, solar constant at coordinates of body center."
         dist = spice.vnorm(self.center_to_sun)
-        return L_sol / (4 * math.pi * (dist*1e3)**2)
+        return L_sol / (4 * math.pi * (dist * 1e3)**2)
 
     @property
     def north_pole(self):
@@ -300,7 +300,8 @@ class Spicer(HasTraits):
 
         """
         if func_str is not None and func_str not in ['subpnt', 'sincpt']:
-            raise NotImplementedError('Only "sincpt" and "subpnt" are supported at this time.')
+            raise NotImplementedError(
+                'Only "sincpt" and "subpnt" are supported at this time.')
         elif func_str is not None:
             raise NotImplementedError('not yet implemented.')
             # if not self.instrument or not self.obs:
@@ -319,3 +320,86 @@ class Spicer(HasTraits):
             spoint = self.srfrec(coords).tolist()
         self.spoint_set = True
         self.spoint = spoint
+
+    @property
+    def l_s(self):
+        return np.rad2deg(spice.lspcn(self.target, self.et, self.corr))
+
+    @property
+    def sun_direction(self):
+        if not self.spoint_set:
+            raise SPointNotSetError
+        return spice.vsub(self.center_to_sun, self.spoint)
+
+    @property
+    def illum_angles(self):
+        "Ilumin returns (trgepoch, srfvec, phase, solar, emission)"
+        if self.obs is not None:
+            output = spice.ilumin("Ellipsoid", self.target, self.et,
+                                  self.ref_frame, self.corr, self.obs,
+                                  self.spoint)
+            return IllumAngles.fromtuple(output[2:])
+        else:
+            solar = spice.vsep(self.sun_direction, self.snormal)
+            # leaving at 0 what I don't have
+            return IllumAngles.fromtuple((0, solar, 0))
+
+    @property
+    def snormal(self):
+        if not self.spoint_set:
+            raise SPointNotSetError
+        a, b, c = self.radii
+        return spice.surfnm(a, b, c, self.spoint)
+
+    @property
+    def coords(self):
+        if not self.spoint_set:
+            raise SPointNotSetError
+        return SurfaceCoords.fromtuple(spice.reclat(self.spoint))
+
+    @property
+    def local_soltime(self):
+        return spice.et2lst(self.et, self.target_id, self.coords.lon,
+                            "PLANETOGRAPHIC")[1]  # returning 24h string here.
+
+
+class MarsSpicer(Spicer):
+    target = 'MARS'
+    obs = Enum([None, 'MRO', 'MGS', 'MEX'])
+    instrument = Enum([None, 'MRO_HIRISE', 'MRO_CRISM', 'MRO_CTX'])
+    # Coords dictionary to store often used coords
+    location_coords = dict(inca=(220.09830399469547,
+                                 -440.60853011059214,
+                                 -3340.5081261541495))
+
+    def __init__(self, time=None, obs=None, inst=None):
+        """ Initialising MarsSpicer class.
+
+        Demo:
+        >>> mspicer = MarsSpicer(time='2007-02-16T17:45:48.642')
+        >>> mspicer.goto('inca')
+        >>> print('Incidence angle: {0:g}'.format(mspicer.illum_angles.dsolar))
+        Incidence angle: 95.5388
+
+        >>> mspicer = MarsSpicer(time='2007-01-27T12:00:00')
+        >>> mspicer.set_spoint_by(lon=300, lat = -80)
+        >>> print('Incidence angle: {0:g}'.format(mspicer.illum_angles.dsolar))
+        Incidence angle: 85.8875
+        """
+        super().__init__('MARS', time=time)
+        self.obs = obs
+        self.instrument = inst
+
+    def goto(self, loc_string):
+        """Set self.spoint to coordinates as saved in location_coords.
+
+        Currently available locations:
+            'inca'  (call like so: mspicer.goto('inca'))
+        """
+        self.spoint_set = True
+        self.spoint = self.location_coords[loc_string.lower()]
+
+
+def get_current_l_s():
+    ms = MarsSpicer()
+    return round(ms.l_s, 1)
