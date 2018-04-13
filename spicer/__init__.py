@@ -1,1 +1,1 @@
-from .spicer import Spicer, IllumAngles, SurfaceCoords
+from .spicer import Spicer, IllumAngles, SurfaceCoords, MarsSpicer
