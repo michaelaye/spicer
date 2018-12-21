@@ -13,7 +13,7 @@ dir_path = modpath.parent
 
 KERNELROOT = dir_path / 'kernels'
 
-download_root = 'http://naif.jpl.nasa.gov/pub/naif/generic_kernels/'
+download_root = 'https://naif.jpl.nasa.gov/pub/naif/generic_kernels/'
 
 generic_kernel_list = ['lsk/naif0011.tls',
                        'pck/pck00010.tpc',
