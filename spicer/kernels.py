@@ -33,7 +33,7 @@ def do_download(source, target):
     target: pathlib.Path
     """
 
-    source.parent.mkdir(parents=True, exist_ok=True)
+    target.parent.mkdir(parents=True, exist_ok=True)
     print('downloading', source, 'to', target)
     urlretrieve(source, str(target))
 
