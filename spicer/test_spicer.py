@@ -19,7 +19,7 @@ def test_illum_angles_from_tuples():
 
 
 def test_coords():
-    coords = spicer.Coords(lat=0, lon=pi)
+    coords = spicer.SurfaceCoords(lat=0, lon=pi)
     assert np.allclose([coords.dlat, coords.dlon, coords.radius],
                        [0.0, 180, 0.0])
 

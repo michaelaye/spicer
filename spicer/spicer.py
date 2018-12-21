@@ -7,7 +7,7 @@ import numpy as np
 import spiceypy as spice
 from traitlets import Float, HasTraits, Unicode, Enum
 
-from .exceptions import SpiceError, MissingParameterError
+from .exceptions import SpiceError, MissingParameterError, SPointNotSetError
 from .kernels import load_generic_kernels
 
 load_generic_kernels()
@@ -21,11 +21,36 @@ Will be used to calculate solar constants at the body.
 """
 
 # types
-Radii = namedtuple('Radii', 'a b c')
+Radii = namedtuple("Radii", "a b c")
 """Simple named Radii structure.
 
 Stores the 3 element radii tuple of SPICE in a named structure.
 """
+
+
+def make_axis_rotation_matrix(direction, angle):
+    """
+    Create a rotation matrix corresponding to the rotation around a general
+    axis by a specified angle.
+
+    R = dd^T + cos(a) (I - dd^T) + sin(a) skew(d)
+
+    Parameters:
+
+        angle : float a
+        direction : array d
+    """
+    d = np.array(direction, dtype=np.float64)
+    d /= np.linalg.norm(d)
+
+    eye = np.eye(3, dtype=np.float64)
+    ddt = np.outer(d, d)
+    skew = np.array(
+        [[0, d[2], -d[1]], [-d[2], 0, d[0]], [d[1], -d[0], 0]], dtype=np.float64
+    )
+
+    mtx = ddt + math.cos(angle) * (eye - ddt) + math.sin(angle) * skew
+    return mtx
 
 
 class IllumAngles(HasTraits):
@@ -45,6 +70,7 @@ class IllumAngles(HasTraits):
     dsolar
     demission
     """
+
     phase = Float(0)
     solar = Float(0)
     emission = Float(0)
@@ -72,8 +98,11 @@ class IllumAngles(HasTraits):
         return np.rad2deg(self.emission)
 
     def __call__(self):
-        print("Phase: {0} deg\nSolar Incidence: {1} deg\nEmission: {2} deg"
-              .format(self.dphase, self.dsolar, self.demission))
+        print(
+            "Phase: {0} deg\nSolar Incidence: {1} deg\nEmission: {2} deg".format(
+                self.dphase, self.dsolar, self.demission
+            )
+        )
 
 
 class SurfaceCoords(HasTraits):
@@ -91,6 +120,7 @@ class SurfaceCoords(HasTraits):
     dlon
     dlat
     """
+
     lon = Float
     lat = Float
     radius = Float
@@ -128,8 +158,9 @@ class SurfaceCoords(HasTraits):
 
     def __str__(self):
         "Return string with useful summary."
-        return ("Longitude: {0} deg\nLatitude: {1} deg\nRadius: {2} km"
-                .format(self.dlon, self.dlat, self.radius))
+        return "Longitude: {0} deg\nLatitude: {1} deg\nRadius: {2} km".format(
+            self.dlon, self.dlat, self.radius
+        )
 
     def __call__(self):
         "Print pretty info on call."
@@ -168,19 +199,38 @@ class Spicer(HasTraits):
     l_s
     sun_direction
     """
-    method = Unicode('Near point:ellipsoid')
-    corr = Unicode('none')
+
+    method = Unicode("Near point:ellipsoid")
+    corr = Unicode("none")
     target = None
     _body = Unicode
     _ref_frame = Unicode
 
-    def __init__(self, body, time=None):
+    def __init__(self, body, time=None, tilt=0, aspect=0):
         self._body = body
         if time is None:
             self.time = dt.datetime.now()
         else:
             self.time = tparser.parse(time)
         self._ref_frame = "IAU_" + str(self.body).upper()
+        self._tilt = tilt
+        self._aspect = aspect
+
+    @property
+    def tilt(self):
+        return self._tilt
+
+    @tilt.setter
+    def tilt(self, val):
+        self._tilt = val
+
+    @property
+    def aspect(self):
+        return self._aspect
+
+    @aspect.setter
+    def aspect(self, val):
+        self._aspect = val
 
     @property
     def body(self):
@@ -237,8 +287,7 @@ class Spicer(HasTraits):
 
         # TODO: spkezp would be faster, but it uses body codes instead of names
         """
-        output = spice.spkpos(
-            target, self.et, self.ref_frame, self.corr, self.body)
+        output = spice.spkpos(target, self.et, self.ref_frame, self.corr, self.body)
         return output
 
     @property
@@ -251,7 +300,7 @@ class Spicer(HasTraits):
     def solar_constant(self):
         "float : With global value L_s, solar constant at coordinates of body center."
         dist = spice.vnorm(self.center_to_sun)
-        return L_sol / (4 * math.pi * (dist * 1e3)**2)
+        return L_sol / (4 * math.pi * (dist * 1e3) ** 2)
 
     @property
     def north_pole(self):
@@ -299,11 +348,12 @@ class Spicer(HasTraits):
         func_str : {'subpnt', 'sincpt'}
 
         """
-        if func_str is not None and func_str not in ['subpnt', 'sincpt']:
+        if func_str is not None and func_str not in ["subpnt", "sincpt"]:
             raise NotImplementedError(
-                'Only "sincpt" and "subpnt" are supported at this time.')
+                'Only "sincpt" and "subpnt" are supported at this time.'
+            )
         elif func_str is not None:
-            raise NotImplementedError('not yet implemented.')
+            raise NotImplementedError("not yet implemented.")
             # if not self.instrument or not self.obs:
             #     print("Observer and/or instrument have to be set first.")
             #     return
@@ -314,7 +364,7 @@ class Spicer(HasTraits):
             # else:
             #     raise Exception("No valid method recognized.")
         elif None in [lat, lon]:
-            raise MissingParameterError('both lat and lon need to be given.')
+            raise MissingParameterError("both lat and lon need to be given.")
         else:
             coords = SurfaceCoords(lat=lat, lon=lon)
             spoint = self.srfrec(coords).tolist()
@@ -333,11 +383,18 @@ class Spicer(HasTraits):
 
     @property
     def illum_angles(self):
-        "Ilumin returns (trgepoch, srfvec, phase, solar, emission)"
+        """Ilumin returns (trgepoch, srfvec, phase, solar, emission)
+        """
         if self.obs is not None:
-            output = spice.ilumin("Ellipsoid", self.target, self.et,
-                                  self.ref_frame, self.corr, self.obs,
-                                  self.spoint)
+            output = spice.ilumin(
+                "Ellipsoid",
+                self.target,
+                self.et,
+                self.ref_frame,
+                self.corr,
+                self.obs,
+                self.spoint,
+            )
             return IllumAngles.fromtuple(output[2:])
         else:
             solar = spice.vsep(self.sun_direction, self.snormal)
@@ -359,18 +416,72 @@ class Spicer(HasTraits):
 
     @property
     def local_soltime(self):
-        return spice.et2lst(self.et, self.target_id, self.coords.lon,
-                            "PLANETOGRAPHIC")[1]  # returning 24h string here.
+        return spice.et2lst(self.et, self.target_id, self.coords.lon, "PLANETOGRAPHIC")[
+            1
+        ]  # returning 24h string here.
+
+    def _get_flux(self, vector):
+        diff_angle = spice.vsep(vector, self.sun_direction)
+        if (self.illum_angles.dsolar > 90) or (np.degrees(diff_angle) > 90):
+            return 0
+        else:
+            return (
+                self.solar_constant
+                * math.cos(diff_angle)
+                * math.exp(-self.tau / math.cos(self.illum_angles.solar))
+            )
+
+    @property
+    def F_flat(self):
+        return self._get_flux(self.snormal)
+
+    @property
+    def to_north(self):
+        if not self.spoint_set:
+            raise SPointNotSetError
+        return spice.vsub(self.north_pole, self.spoint)
+
+    @property
+    def tilted_normal(self):
+        """
+        Create a tilted normal vector for an inclined surface by self.tilt
+
+        By default the tilt is applied to the snormal vector towards north.
+        """
+        if not self.spoint_set:
+            raise SPointNotSetError
+        # cross product
+        axis = spice.vcrss(self.to_north, self.spoint)
+        rotmat = make_axis_rotation_matrix(axis, np.radians(self.tilt))
+        return np.matrix.dot(rotmat, self.snormal)
+
+    @property
+    def F_tilt(self):
+        return self._get_flux(self.tilted_normal)
+
+    @property
+    def tilted_rotated_normal(self):
+        """
+        Rotate the tilted normal around the snormal to create an aspect angle.
+
+        Angle should be in degrees.
+        """
+        rotmat = make_axis_rotation_matrix(self.snormal, np.radians(self.aspect))
+        return np.matrix.dot(rotmat, self.tilted_normal)
+
+    @property
+    def F_aspect(self):
+        return self._get_flux(self.tilted_rotated_normal)
 
 
 class MarsSpicer(Spicer):
-    target = 'MARS'
-    obs = Enum([None, 'MRO', 'MGS', 'MEX'])
-    instrument = Enum([None, 'MRO_HIRISE', 'MRO_CRISM', 'MRO_CTX'])
+    target = "MARS"
+    obs = Enum([None, "MRO", "MGS", "MEX"])
+    instrument = Enum([None, "MRO_HIRISE", "MRO_CRISM", "MRO_CTX"])
     # Coords dictionary to store often used coords
-    location_coords = dict(inca=(220.09830399469547,
-                                 -440.60853011059214,
-                                 -3340.5081261541495))
+    location_coords = dict(
+        inca=(220.09830399469547, -440.60853011059214, -3340.5081261541495)
+    )
 
     def __init__(self, time=None, obs=None, inst=None):
         """ Initialising MarsSpicer class.
@@ -386,7 +497,7 @@ class MarsSpicer(Spicer):
         >>> print('Incidence angle: {0:g}'.format(mspicer.illum_angles.dsolar))
         Incidence angle: 85.8875
         """
-        super().__init__('MARS', time=time)
+        super().__init__(self.target, time=time)
         self.obs = obs
         self.instrument = inst
 
@@ -398,6 +509,36 @@ class MarsSpicer(Spicer):
         """
         self.spoint_set = True
         self.spoint = self.location_coords[loc_string.lower()]
+
+
+class TritonSpicer(Spicer):
+    target = "TRITON"
+    obs = Enum([None, "EARTH"])
+
+    def __init__(self, time=None, obs=None, inst=None):
+        super().__init__(self.target, time=time)
+        self.obs = obs
+        self.instrument = inst
+
+
+class EnceladusSpicer(Spicer):
+    target = "ENCELADUS"
+    obs = Enum([None, "EARTH"])
+
+    def __init__(self, time=None, obs=None, inst=None):
+        super().__init__(self.target, time=time)
+        self.obs = obs
+        self.instrument = inst
+
+
+class PlutoSpicer(Spicer):
+    target = "PLUTO"
+    obs = Enum([None, "EARTH"])
+
+    def __init__(self, time=None, obs=None, inst=None):
+        super().__init__(self.target, time=time)
+        self.obs = obs
+        self.instrument = inst
 
 
 def get_current_l_s():
