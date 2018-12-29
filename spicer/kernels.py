@@ -13,13 +13,12 @@ dir_path = modpath.parent
 
 KERNELROOT = dir_path / 'kernels'
 
-download_root = 'http://naif.jpl.nasa.gov/pub/naif/generic_kernels/'
+download_root = 'https://naif.jpl.nasa.gov/pub/naif/generic_kernels/'
 
 generic_kernel_list = ['lsk/naif0011.tls',
                        'pck/pck00010.tpc',
-                       'spk/planets/de421.bsp',
                        'spk/planets/de403-masses.tpc',
-                       # 'spk/planets/de430.bsp',
+                       'spk/planets/de430.bsp',
                        ]
 generic_kernels = [KERNELROOT.joinpath(i) for i in generic_kernel_list]
 
@@ -33,7 +32,7 @@ def do_download(source, target):
     target: pathlib.Path
     """
 
-    source.parent.mkdir(parents=True, exist_ok=True)
+    target.parent.mkdir(parents=True, exist_ok=True)
     print('downloading', source, 'to', target)
     urlretrieve(source, str(target))
 
