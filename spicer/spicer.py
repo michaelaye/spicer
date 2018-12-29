@@ -1,9 +1,11 @@
 import datetime as dt
 from collections import namedtuple
+from math import tau
 
 import dateutil.parser as tparser
 import numpy as np
 import spiceypy as spice
+from astropy.constants import L_sun
 from astropy import units as u
 from traitlets import Enum, Float, HasTraits, Unicode
 
@@ -12,15 +14,6 @@ from .kernels import load_generic_kernels
 
 load_generic_kernels()
 
-# constansts
-L_sol = 3.839e26
-"""Solar luminosity [Watt].
-
-Global constant.
-Will be used to calculate solar constants at the body.
-"""
-
-# types
 Radii = namedtuple("Radii", "a b c")
 """Simple named Radii structure.
 
@@ -197,21 +190,23 @@ class Spicer(HasTraits):
     sun_direction
     """
 
-    method = Unicode("Near point:ellipsoid")
+    method = "Near point:ellipsoid"
     corr = Unicode("none")
     target = None
     _body = Unicode
     _ref_frame = Unicode
 
-    def __init__(self, body, time=None, tilt=0, aspect=0):
+    def __init__(self, body, time=None, tilt=0, aspect=0, tau=0.0):
         self._body = body
         if time is None:
             self.time = dt.datetime.now()
         else:
             self.time = tparser.parse(time)
         self._ref_frame = "IAU_" + str(self.body).upper()
-        self._tilt = tilt
-        self._aspect = aspect
+        self._tilt = tilt * u.deg
+        self._aspect = aspect * u.deg
+        self.spoint_set = False
+        self.tau = tau
 
     @property
     def tilt(self):
@@ -291,13 +286,13 @@ class Spicer(HasTraits):
     def center_to_sun(self):
         "float : Distance of body center to sun [km]."
         cts, lighttime = self.body_to_object("SUN")
-        return cts
+        return cts * u.km
 
     @property
     def solar_constant(self):
         "float : With global value L_s, solar constant at coordinates of body center."
-        dist = spice.vnorm(self.center_to_sun)
-        return L_sol / (4 * np.pi * (dist * 1e3) ** 2)
+        dist = spice.vnorm(self.center_to_sun.value) * u.km
+        return (L_sun / (2 * tau * (dist) ** 2)).to(u.W / u.m / u.m)
 
     @property
     def north_pole(self):
@@ -376,7 +371,7 @@ class Spicer(HasTraits):
     def sun_direction(self):
         if not self.spoint_set:
             raise SPointNotSetError
-        return spice.vsub(self.center_to_sun, self.spoint)
+        return spice.vsub(self.center_to_sun.value, self.spoint)
 
     @property
     def illum_angles(self):
@@ -415,13 +410,11 @@ class Spicer(HasTraits):
     def local_soltime(self):
         return spice.et2lst(
             self.et, self.target_id, self.coords.lon.value, "PLANETOGRAPHIC"
-        )[
-            1
-        ]  # returning 24h string here.
+        )[3]
 
     def _get_flux(self, vector):
         diff_angle = spice.vsep(vector, self.sun_direction)
-        if (self.illum_angles.dsolar > 90) or (np.degrees(diff_angle) > 90):
+        if (self.illum_angles.dsolar > 90 * u.deg) or (np.degrees(diff_angle) > 90):
             return 0
         else:
             return (
@@ -452,7 +445,7 @@ class Spicer(HasTraits):
         # cross product
         axis = spice.vcrss(self.to_north, self.spoint)
         rotmat = make_axis_rotation_matrix(axis, np.radians(self.tilt))
-        return np.matrix.dot(rotmat, self.snormal)
+        return np.matrix.dot(rotmat, self.snormal).value
 
     @property
     def F_tilt(self):
@@ -466,11 +459,60 @@ class Spicer(HasTraits):
         Angle should be in degrees.
         """
         rotmat = make_axis_rotation_matrix(self.snormal, np.radians(self.aspect))
-        return np.matrix.dot(rotmat, self.tilted_normal)
+        return np.matrix.dot(rotmat, self.tilted_normal).value
 
     @property
     def F_aspect(self):
         return self._get_flux(self.tilted_rotated_normal)
+
+    def advance_time_by(self, secs):
+        self.time += dt.timedelta(seconds=secs)
+
+    def time_series(self, flux_name, dt, no_of_steps=None, provide_times=None):
+        """
+        Provide time series of fluxes with a <dt> in seconds as sampling
+        intervals.
+
+        Parameters
+        ----------
+        flux_name :
+            String. Decides which of flux vector attributes to integrate.
+            Should be one of ['F_flat','F_tilt','F_aspect']
+        dt :
+            delta time for the time series, in seconds
+        no_of_steps :
+            number of steps to add to time series
+        provide_times :
+            Should be set to one of ['time','utc','et','l_s'] if wanted.
+
+        Returns
+        -------
+        if provide_times is None:
+            out : ndarray
+            Array of evenly spaced flux values, given as E/(dt*m**2).
+            I.e. the internal fluxes are multiplied by dt.
+        else:
+            out : (ndarray, ndarray)
+            Tuple of 2 arrays, out[0] being the times, out[1] the fluxes
+        """
+        saved_time = self.time
+        times = []
+        energies = []
+        i = 0
+        criteria = i < no_of_steps
+        while criteria:
+            i += 1
+            if provide_times:
+                times.append(getattr(self, provide_times))
+            energies.append(getattr(self, flux_name) * dt)
+            self.advance_time_by(dt)
+            criteria = i < no_of_steps
+
+        self.time = saved_time
+        if provide_times:
+            return (np.array(times), np.array(energies))
+        else:
+            return np.array(energies)
 
 
 class MarsSpicer(Spicer):
@@ -482,7 +524,7 @@ class MarsSpicer(Spicer):
         inca=(220.09830399469547, -440.60853011059214, -3340.5081261541495)
     )
 
-    def __init__(self, time=None, obs=None, inst=None):
+    def __init__(self, time=None, obs=None, inst=None, **kwargs):
         """ Initialising MarsSpicer class.
 
         Demo:
@@ -496,7 +538,7 @@ class MarsSpicer(Spicer):
         >>> print('Incidence angle: {0:g}'.format(mspicer.illum_angles.dsolar))
         Incidence angle: 85.8875
         """
-        super().__init__(self.target, time=time)
+        super().__init__(self.target, time=time, **kwargs)
         self.obs = obs
         self.instrument = inst
 
@@ -532,6 +574,16 @@ class EnceladusSpicer(Spicer):
 
 class PlutoSpicer(Spicer):
     target = "PLUTO"
+    obs = Enum([None, "EARTH"])
+
+    def __init__(self, time=None, obs=None, inst=None):
+        super().__init__(self.target, time=time)
+        self.obs = obs
+        self.instrument = inst
+
+
+class EarthSpicer(Spicer):
+    target = "EARTH"
     obs = Enum([None, "EARTH"])
 
     def __init__(self, time=None, obs=None, inst=None):
