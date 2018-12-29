@@ -1,13 +1,13 @@
 import datetime as dt
-import math
 from collections import namedtuple
 
 import dateutil.parser as tparser
 import numpy as np
 import spiceypy as spice
-from traitlets import Float, HasTraits, Unicode, Enum
+from astropy import units as u
+from traitlets import Enum, Float, HasTraits, Unicode
 
-from .exceptions import SpiceError, MissingParameterError, SPointNotSetError
+from .exceptions import MissingParameterError, SpiceError, SPointNotSetError
 from .kernels import load_generic_kernels
 
 load_generic_kernels()
@@ -49,11 +49,11 @@ def make_axis_rotation_matrix(direction, angle):
         [[0, d[2], -d[1]], [-d[2], 0, d[0]], [d[1], -d[0], 0]], dtype=np.float64
     )
 
-    mtx = ddt + math.cos(angle) * (eye - ddt) + math.sin(angle) * skew
+    mtx = ddt + np.cos(angle) * (eye - ddt) + np.sin(angle) * skew
     return mtx
 
 
-class IllumAngles(HasTraits):
+class IllumAngles:
 
     """Managing illumination angles.
 
@@ -71,41 +71,43 @@ class IllumAngles(HasTraits):
     demission
     """
 
-    phase = Float(0)
-    solar = Float(0)
-    emission = Float(0)
-    dphase = Float
-    dsolar = Float
-    demission = Float
-
     @classmethod
-    def fromtuple(cls, args, **traits):
-        return cls(phase=args[0], solar=args[1], emission=args[2], **traits)
+    def fromtuple(cls, args):
+        newargs = np.degrees(args)
+        return cls(phase=newargs[0], solar=newargs[1], emission=newargs[2])
+
+    def __init__(self, phase=0, solar=0, emission=0):
+        self.phase = (phase * u.deg).to(u.radian)
+        self.solar = (solar * u.deg).to(u.radian)
+        self.emission = (emission * u.deg).to(u.radian)
 
     @property
     def dphase(self):
         "float : degree version of self.phase"
-        return np.rad2deg(self.phase)
+        return self.phase.to(u.deg)
 
     @property
     def dsolar(self):
         "float : degree version of solar incidence angle."
-        return np.rad2deg(self.solar)
+        return self.solar.to(u.deg)
 
     @property
     def demission(self):
         "float : degree version of emission angle."
-        return np.rad2deg(self.emission)
+        return self.emission.to(u.deg)
 
-    def __call__(self):
-        print(
-            "Phase: {0} deg\nSolar Incidence: {1} deg\nEmission: {2} deg".format(
-                self.dphase, self.dsolar, self.demission
-            )
+    def __str__(self):
+        s = "Print-out precision is '.2f'\n"
+        s += "Phase: {0:.2f}\nSolar Incidence: {1:.2f}\nEmission: {2:.2f}".format(
+            self.dphase, self.dsolar, self.demission
         )
+        return s
+
+    def __repr__(self):
+        return self.__str__()
 
 
-class SurfaceCoords(HasTraits):
+class SurfaceCoords:
 
     """Managing SPICE surface coordinates.
 
@@ -120,10 +122,6 @@ class SurfaceCoords(HasTraits):
     dlon
     dlat
     """
-
-    lon = Float
-    lat = Float
-    radius = Float
 
     @classmethod
     def fromtuple(cls, args):
@@ -140,31 +138,30 @@ class SurfaceCoords(HasTraits):
         lat: float
             Latitude
         """
-        return cls(radius=args[0], lon=args[1], lat=args[2])
+        return cls(radius=args[0], lon=np.degrees(args[1]), lat=np.degrees(args[2]))
+
+    def __init__(self, lon=0, lat=0, radius=0):
+        self.lon = (lon * u.deg).to(u.radian)
+        self.lat = (lat * u.deg).to(u.radian)
+        self.radius = radius * u.km
 
     @property
     def dlon(self):
-        "float : Degree version of radians longitude."
-        dlon = np.rad2deg(self.lon)
-        # force 360 eastern longitude:
-        while dlon < 0:
-            dlon += 360.0
-        return dlon
+        return self.lon.to(u.deg)
 
     @property
     def dlat(self):
         "float : Degree version of radians latitude."
-        return np.rad2deg(self.lat)
+        return self.lat.to(u.deg)
 
     def __str__(self):
         "Return string with useful summary."
-        return "Longitude: {0} deg\nLatitude: {1} deg\nRadius: {2} km".format(
+        return "Longitude: {0}\nLatitude: {1}\nRadius: {2}".format(
             self.dlon, self.dlat, self.radius
         )
 
-    def __call__(self):
-        "Print pretty info on call."
-        print(self.__str__())
+    def __repr__(self):
+        return self.__str__()
 
 
 class Spicer(HasTraits):
@@ -300,7 +297,7 @@ class Spicer(HasTraits):
     def solar_constant(self):
         "float : With global value L_s, solar constant at coordinates of body center."
         dist = spice.vnorm(self.center_to_sun)
-        return L_sol / (4 * math.pi * (dist * 1e3) ** 2)
+        return L_sol / (4 * np.pi * (dist * 1e3) ** 2)
 
     @property
     def north_pole(self):
@@ -337,8 +334,8 @@ class Spicer(HasTraits):
         if body is None:
             body = self.target_id
         if not str(body).isdigit():
-            body, _ = spice.bodn2c(body)
-        return spice.srfrec(body, surfcoord.lon, surfcoord.lat)
+            body = spice.bodn2c(body)
+        return spice.srfrec(body, surfcoord.lon.value, surfcoord.lat.value)
 
     def set_spoint_by(self, func_str=None, lon=None, lat=None):
         """Set the current surface point for illumination calculations.
@@ -416,7 +413,9 @@ class Spicer(HasTraits):
 
     @property
     def local_soltime(self):
-        return spice.et2lst(self.et, self.target_id, self.coords.lon, "PLANETOGRAPHIC")[
+        return spice.et2lst(
+            self.et, self.target_id, self.coords.lon.value, "PLANETOGRAPHIC"
+        )[
             1
         ]  # returning 24h string here.
 
@@ -427,8 +426,8 @@ class Spicer(HasTraits):
         else:
             return (
                 self.solar_constant
-                * math.cos(diff_angle)
-                * math.exp(-self.tau / math.cos(self.illum_angles.solar))
+                * np.cos(diff_angle)
+                * np.exp(-self.tau / np.cos(self.illum_angles.solar))
             )
 
     @property
