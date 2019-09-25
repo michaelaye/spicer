@@ -7,7 +7,7 @@ with open('README.md') as readme_file:
     readme = readme_file.read()
 
 test_requirements = ['pytest']
-setup_requires = ['spiceypy']
+setup_requirements = ['spiceypy']
 setup(
     name="spicer",
     version='0.4.0',
@@ -18,10 +18,9 @@ setup(
     author="K.-Michael Aye",
     author_email="kmichael.aye@gmail.com",
     license="MIT license",
-    keywords="Solarsystem, planetaryscience",
+    keywords="Solarsystem, planetaryscience, planets",
     zip_safe=True,
     url="https://github.com/michaelaye/spicer",
-    keywords='planets',
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
         'Intended Audience :: Developers',
