@@ -3,9 +3,8 @@ from setuptools import setup, find_packages
 
 setup(
     name="spicer",
-    version="0.2.b0",
+    version='0.3.0',
     packages=find_packages(),
-
     # metadata
     author="K.-Michael Aye",
     author_email="kmichael.aye@gmail.com",
