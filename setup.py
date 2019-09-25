@@ -10,7 +10,7 @@ test_requirements = ['pytest']
 setup_requirements = ['spiceypy']
 setup(
     name="spicer",
-    version='0.4.0',
+    version='0.4.1',
     packages=find_packages(),
     description="Library to make SPICE a bit easier",
     long_description=readme + '\n\n',
