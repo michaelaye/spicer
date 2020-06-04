@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 
 import spiceypy as spice
+from urlpath import URL
 
 from planetarypy.utils import url_retrieve
 
@@ -14,7 +15,7 @@ dir_path = modpath.parent
 
 KERNELROOT = dir_path / "kernels"
 
-download_root = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/"
+download_root = URL("https://naif.jpl.nasa.gov/pub/naif/generic_kernels/")
 
 generic_kernel_list = [
     "lsk/naif0012.tls",
@@ -35,18 +36,17 @@ def do_download(source, target):
     target: pathlib.Path
     """
     target.parent.mkdir(parents=True, exist_ok=True)
-    print("downloading", source, "to", target)
     url_retrieve(source, str(target))
 
 
 def download_generic_kernels(kernel=None):
     "Download all kernels as required by generic_kernel_list."
     if kernel is None:
-        dl_urls = [download_root + i for i in generic_kernel_list]
+        dl_urls = [download_root / i for i in generic_kernel_list]
         for dl_url, savepath in zip(dl_urls, generic_kernels):
             do_download(dl_url, savepath)
     else:
-        dl_url = download_root + str(kernel.relative_to(KERNELROOT))
+        dl_url = download_root / str(kernel.relative_to(KERNELROOT))
         print(f"Downloading {dl_url} into {kernel}")
         do_download(dl_url, kernel)
 
