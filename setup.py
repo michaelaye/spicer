@@ -6,21 +6,22 @@ from setuptools import find_packages, setup
 with open("README.md") as readme_file:
     readme = readme_file.read()
 
-test_requirements = ["pytest"]
-setup_requirements = ["spiceypy", "tqdm", "planetarypy"]
 setup(
     name="spicer",
     version="0.4.2",
-    packages=find_packages(),
     description="Library to make SPICE a bit easier",
     long_description=readme + "\n\n",
     # metadata
     author="K.-Michael Aye",
     author_email="kmichael.aye@gmail.com",
     license="MIT license",
-    keywords="Solarsystem, planetaryscience, planets",
     zip_safe=True,
     url="https://github.com/michaelaye/spicer",
+    packages=find_packages(),
+    include_package_data=True,
+    install_requires=["spiceypy", "tqdm", "planetarypy",],
+    python_requires=">=3.6, <4",
+    keywords="Solarsystem, planetaryscience, planets",
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",
         "Intended Audience :: Developers",
@@ -28,8 +29,6 @@ setup(
         "Natural Language :: English",
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3 :: Only",
     ],
-    test_suite="tests",
-    tests_require=test_requirements,
-    setup_requires=setup_requirements,
 )
