@@ -10,7 +10,7 @@ test_requirements = ["pytest"]
 setup_requirements = ["spiceypy", "tqdm", "planetarypy"]
 setup(
     name="spicer",
-    version="0.4.1",
+    version="0.4.2",
     packages=find_packages(),
     description="Library to make SPICE a bit easier",
     long_description=readme + "\n\n",
