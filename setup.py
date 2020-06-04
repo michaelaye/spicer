@@ -19,7 +19,14 @@ setup(
     url="https://github.com/michaelaye/spicer",
     packages=find_packages(),
     include_package_data=True,
-    install_requires=["spiceypy", "tqdm", "planetarypy>=0.7", "astropy", "urlpath"],
+    install_requires=[
+        "spiceypy",
+        "tqdm",
+        "planetarypy>=0.7",
+        "astropy",
+        "urlpath",
+        "importlib_resources; python_version<'3.9'",
+    ],
     python_requires=">=3.6, <4",
     keywords="Solarsystem, planetaryscience, planets",
     classifiers=[

@@ -1,30 +1,27 @@
 """This module helps to manage SPICE kernels, incl. downloading and listing
 loaded kernels (which unbelievably is not available from SPICE directly).
 """
-import os
 from pathlib import Path
 
 import spiceypy as spice
+from importlib_resources import files
 from urlpath import URL
 
 from planetarypy.utils import url_retrieve
 
-# TODO: Use resources to get local file paths.
-modpath = Path(os.path.abspath(__file__))
-dir_path = modpath.parent
-
-KERNELROOT = dir_path / "kernels"
+KERNELROOT = files("spicer").joinpath("kernels")
 
 download_root = URL("https://naif.jpl.nasa.gov/pub/naif/generic_kernels/")
 
-generic_kernel_list = [
+generic_kernel_names = [
     "lsk/naif0012.tls",
     "pck/pck00010.tpc",
     "pck/de-403-masses.tpc",
     "spk/planets/de430.bsp",
     "spk/satellites/mar097.bsp",
 ]
-generic_kernels = [KERNELROOT.joinpath(i) for i in generic_kernel_list]
+
+generic_kernels_paths = [KERNELROOT.joinpath(i) for i in generic_kernel_names]
 
 
 def do_download(source, target):
@@ -42,20 +39,20 @@ def do_download(source, target):
 def download_generic_kernels(kernel=None):
     "Download all kernels as required by generic_kernel_list."
     if kernel is None:
-        dl_urls = [download_root / i for i in generic_kernel_list]
-        for dl_url, savepath in zip(dl_urls, generic_kernels):
+        dl_urls = [download_root / i for i in generic_kernel_names]
+        for dl_url, savepath in zip(dl_urls, generic_kernels_paths):
             do_download(dl_url, savepath)
     else:
-        dl_url = download_root / str(kernel.relative_to(KERNELROOT))
+        dl_url = download_root / kernel.relative_to(KERNELROOT)
         print(f"Downloading {dl_url} into {kernel}")
         do_download(dl_url, kernel)
 
 
 def check_generic_kernels():
     "Check for existence of generic_kernels and download if not there."
-    for kernel in generic_kernels:
+    for kernel in generic_kernels_paths:
         if not kernel.exists():
-            print(f"Cannot find generic kernel {kernel}. Downloading ...")
+            print(f"Cannot find generic kernel {kernel.name}. Downloading ...")
             download_generic_kernels(kernel)
             print("Done.")
 
@@ -69,7 +66,7 @@ def load_generic_kernels():
     not there.
     """
     check_generic_kernels()
-    for kernel in generic_kernels:
+    for kernel in generic_kernels_paths:
         spice.furnsh(str(kernel))
 
 
