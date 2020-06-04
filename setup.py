@@ -8,7 +8,7 @@ with open("README.md") as readme_file:
 
 setup(
     name="spicer",
-    version="0.4.3",
+    version="0.4.4",
     description="Library to make SPICE a bit easier",
     long_description=readme + "\n\n",
     # metadata
