@@ -2,10 +2,11 @@
 loaded kernels (which unbelievably is not available from SPICE directly).
 """
 import os
-from urllib.request import urlretrieve
+from pathlib import Path
 
 import spiceypy as spice
-from pathlib import Path
+
+from planetarypy.utils import url_retrieve
 
 # TODO: Use resources to get local file paths.
 modpath = Path(os.path.abspath(__file__))
@@ -35,7 +36,7 @@ def do_download(source, target):
     """
     target.parent.mkdir(parents=True, exist_ok=True)
     print("downloading", source, "to", target)
-    urlretrieve(source, str(target))
+    url_retrieve(source, str(target))
 
 
 def download_generic_kernels(kernel=None):
