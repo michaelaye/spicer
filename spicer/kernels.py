@@ -44,7 +44,7 @@ def download_generic_kernels(kernel=None):
             do_download(dl_url, savepath)
     else:
         dl_url = download_root / kernel.relative_to(KERNELROOT)
-        print(f"Downloading {dl_url} into {kernel}")
+        print(f"Downloading\n{dl_url}\ninto\n{kernel}\n")
         do_download(dl_url, kernel)
 
 
@@ -52,9 +52,8 @@ def check_generic_kernels():
     "Check for existence of generic_kernels and download if not there."
     for kernel in generic_kernels_paths:
         if not kernel.exists():
-            print(f"Cannot find generic kernel {kernel.name}. Downloading ...")
+            print(f"Cannot find generic kernel {kernel.name} locally.")
             download_generic_kernels(kernel)
-            print("Done.")
 
 
 def load_generic_kernels():
