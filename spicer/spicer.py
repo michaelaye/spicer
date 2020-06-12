@@ -415,7 +415,7 @@ class Spicer(HasTraits):
     def _get_flux(self, vector):
         diff_angle = spice.vsep(vector, self.sun_direction)
         if (self.illum_angles.dsolar > 90 * u.deg) or (np.degrees(diff_angle) > 90):
-            return 0
+            return 0 * u.W / (u.m*u.m)
         else:
             return (
                 self.solar_constant
