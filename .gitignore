@@ -57,3 +57,5 @@ docs/_build/
 target/
 *.sublime-workspace
 spicer/kernels/
+
+**/.mypy_cache
